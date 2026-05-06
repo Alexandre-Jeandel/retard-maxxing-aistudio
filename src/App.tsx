@@ -1,168 +1,237 @@
-import { useState, type FormEvent } from 'react';
-import { motion } from 'motion/react';
-import { Terminal, CheckCircle2, ChevronRight } from 'lucide-react';
-import img1 from '../images/1.png';
-import img2 from '../images/2.png';
+import { useEffect, useState, type FC, type FormEvent } from 'react';
+import { VIDEOS, type Video } from './data/videos';
+import { QUESTS } from './data/quests';
+
+const MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
+
+
+// duplicate the quest list so the marquee track loops seamlessly via translateX(-50%).
+const MARQUEE_QUESTS = [...QUESTS, ...QUESTS];
+
+const Marquee: FC = () => (
+  <div className="marquee">
+    <div className="marquee-track">
+      {MARQUEE_QUESTS.map((q, i) => (
+        <div key={i} className="marquee-card">
+          <div className="q-num">quest {String((i % QUESTS.length) + 1).padStart(2, '0')}</div>
+          <div className="q-name">{q.name}</div>
+          <div className="q-text">{q.text}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const VideoEmbed: FC<{ video: Video }> = ({ video }) => {
+  const [open, setOpen] = useState(false);
+  return open ? (
+    <div className="aspect-video border border-rm">
+      <iframe
+        src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0`}
+        title={video.title}
+        allow="autoplay; encrypted-media; fullscreen"
+        allowFullScreen
+        className="w-full h-full"
+      />
+    </div>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="block w-full aspect-video relative group border border-rm bg-rm-panel overflow-hidden text-left"
+    >
+      <img
+        src={`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`}
+        alt=""
+        loading="lazy"
+        className="absolute inset-0 w-full h-full object-cover grayscale contrast-110 group-hover:grayscale-0 transition"
+      />
+      <div className="absolute inset-0 bg-black/55 group-hover:bg-black/35 transition flex items-center justify-center">
+        <div className="border border-amber text-amber px-4 py-2 font-bold tracking-[0.25em] text-sm group-hover:bg-amber group-hover:text-rm-bg transition-colors">
+          ▶ PLAY
+        </div>
+      </div>
+      <div className="absolute left-0 right-0 bottom-0 p-3 bg-gradient-to-t from-black/95 to-transparent">
+        <div className="text-sm font-bold text-white leading-tight">{video.title}</div>
+        <div className="text-xs text-white/60 mt-0.5">· {video.creator}</div>
+      </div>
+    </button>
+  );
+};
 
 export default function App() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/subscriber-count')
+      .then(r => r.json())
+      .then(d => setCount(typeof d.count === 'number' ? d.count : null))
+      .catch(() => setCount(null));
+  }, []);
+
+  const currentTarget = (() => {
+    if (count === null) return 10;
+    for (const m of MILESTONES) {
+      if (count < m) return m;
+    }
+    return MILESTONES[MILESTONES.length - 1];
+  })();
+  const progress = count !== null ? Math.min((count / currentTarget) * 100, 100) : 0;
+  const isMaxed = count !== null && count >= MILESTONES[MILESTONES.length - 1];
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email) return;
-
     setStatus('submitting');
     setErrorMsg('');
     try {
       const response = await fetch('/api/subscribe', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-
       if (response.ok) {
         setStatus('success');
         setEmail('');
+        setCount(c => (c === null ? c : c + 1));
       } else {
         const data = await response.json().catch(() => ({}));
-        setErrorMsg(data.error || 'Failed to subscribe. Please try again.');
+        setErrorMsg(data.error || 'failed. try again.');
         setStatus('error');
       }
     } catch {
-      setErrorMsg('Network error. Please try again.');
+      setErrorMsg('network error. try again.');
       setStatus('error');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0b101e] text-slate-200 font-sans selection:bg-[#00f0ff] selection:text-[#0b101e] overflow-x-hidden">
-      {/* Background Grid Effect */}
-      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(to_right,#121827_1px,transparent_1px),linear-gradient(to_bottom,#121827_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20" />
+    <div className="min-h-screen bg-rm-bg text-rm-text">
 
-      <div className="max-w-7xl mx-auto px-6 py-12 lg:py-24 relative z-10">
-        {/* Header */}
-        <header className="flex items-center justify-center lg:justify-start mb-12 lg:mb-24">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2"
-          >
-            <Terminal className="w-6 h-6 text-[#00f0ff]" />
-            <span className="font-mono font-bold text-xl tracking-wider text-white">
-              thealtar<span className="text-[#00f0ff]">.quest</span>
-            </span>
-          </motion.div>
-        </header>
+      {/* TOP ZONE: headline only (no wordmark, no marquee yet) */}
+      <div className="max-w-3xl mx-auto px-6 pt-8 lg:pt-12">
 
-        <div className="flex flex-col gap-12 lg:gap-24">
-          {/* Copy & Form */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="max-w-xl mx-auto text-center"
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#00f0ff]/30 bg-[#00f0ff]/10 text-[#00f0ff] font-mono text-xs font-medium mb-6">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00f0ff] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00f0ff]"></span>
-              </span>
-              PROTOCOL PRE-LAUNCH ACTIVE
+        {/* HEADLINE — editorial pull-quote treatment with cartoon */}
+        <section className="mb-0 border-y border-amber py-4 sm:py-6">
+          <div className="flex items-center justify-center">
+            <img
+              src="/images/running_cycle.gif"
+              alt=""
+              className="flex-shrink-0 h-[100px] sm:h-[150px] lg:h-[200px] w-auto mix-blend-multiply pointer-events-none relative z-10 -mr-3 sm:-mr-5 lg:-mr-7"
+            />
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm tracking-[0.3em] uppercase font-bold mb-1 text-rm-muted">⚠ warning</div>
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-[0.95] uppercase tracking-tight text-rm-text">
+                retards only<span className="text-amber">.</span>
+              </h1>
             </div>
+          </div>
+        </section>
 
-            <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 text-white leading-[1.1]">
-              LEVEL UP YOUR <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00f0ff] to-[#b53471] text-glow-cyan">
-                REALITY.
-              </span>
-            </h1>
-            
-            <p className="text-lg text-slate-400 mb-8 leading-relaxed">
-              The ultimate gamified self-improvement system. Turn your life into a main character quest log. 
-              Subscribe now to secure your spot in the beta and unlock a <strong className="text-[#00f0ff] font-mono">50% DISCOUNT</strong> for your first year.
-            </p>
+      </div>
 
-            {/* Opt-in Form */}
-            <div className="bg-[#121827] p-6 rounded-lg border border-slate-800 relative overflow-hidden text-left mx-auto max-w-md lg:max-w-none lg:mx-0">
-              {/* Decorative corners */}
-              <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-[#00f0ff]" />
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-[#00f0ff]" />
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-[#00f0ff]" />
-              <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-[#00f0ff]" />
+      {/* MARQUEE — moved BELOW the title, full viewport width */}
+      <Marquee />
 
-              {status === 'success' ? (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex flex-col items-center justify-center py-6 text-center"
-                >
-                  <div className="w-12 h-12 rounded-full bg-[#00f0ff]/20 flex items-center justify-center mb-4">
-                    <CheckCircle2 className="w-6 h-6 text-[#00f0ff]" />
-                  </div>
-                  <h3 className="font-mono text-lg text-white mb-2">[ REGISTRATION CONFIRMED ]</h3>
-                  <p className="text-slate-400 text-sm">
-                    Your spot is secured. Awaiting protocol initialization. We will contact you soon.
-                  </p>
-                </motion.div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label htmlFor="email" className="block font-mono text-xs text-[#00f0ff] mb-2 uppercase tracking-wider">
-                      Enter Comm-Link (Email)
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <ChevronRight className="h-4 w-4 text-slate-500" />
-                      </div>
-                      <input
-                        type="email"
-                        id="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="block w-full pl-10 pr-3 py-3 bg-[#0b101e] border border-slate-700 rounded-md text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#00f0ff] focus:border-[#00f0ff] font-mono text-sm transition-colors"
-                        placeholder="player@system.net"
-                        disabled={status === 'submitting'}
-                      />
-                    </div>
-                  </div>
-                  {status === 'error' && (
-                    <p className="font-mono text-xs text-red-400 bg-red-900/20 border border-red-800 rounded px-3 py-2">
-                      {errorMsg}
-                    </p>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={status === 'submitting'}
-                    className="w-full relative group overflow-hidden rounded-md bg-[#00f0ff]/10 border border-[#00f0ff]/50 px-4 py-3 font-mono text-sm font-bold text-[#00f0ff] transition-all hover:bg-[#00f0ff]/20 hover:border-[#00f0ff] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="relative z-10 flex items-center justify-center gap-2">
-                      {status === 'submitting' ? 'INITIALIZING...' : 'CLAIM 50% DISCOUNT'}
-                    </span>
-                    {/* Hover effect background */}
-                    <div className="absolute inset-0 h-full w-0 bg-[#00f0ff]/20 transition-all duration-300 ease-out group-hover:w-full" />
-                  </button>
-                </form>
+      {/* MAIN CONTENT */}
+      <div className="max-w-3xl mx-auto px-6 pb-8 lg:pb-12 pt-10">
+
+        {/* HERO COUNTER + email form */}
+        <section className="mb-12">
+          {count !== null ? (
+            <div className="text-center">
+              <div className="text-[6.5rem] lg:text-[10rem] font-bold tabular-nums leading-[0.9] text-rm-text">
+                {count}
+                <span className="text-rm-faint text-3xl lg:text-5xl"> / {currentTarget}</span>
+              </div>
+              <div className="text-xs uppercase tracking-[0.25em] text-rm-faint mt-3">
+                retards locked in
+              </div>
+              <div className="w-full h-1.5 bg-rm-panel border border-rm mt-4">
+                <div
+                  className="h-full bg-amber transition-all duration-700"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="mt-4 text-sm lg:text-base text-rm-muted leading-relaxed">
+                because we're retards too, this is the actual real count of people<br className="hidden lg:inline" />
+                who subscribed. no bots. we're too small to fake it.
+              </p>
+              {isMaxed && (
+                <p className="mt-2 text-xs text-amber tracking-wider">
+                  founding tier locked. public launch incoming.
+                </p>
               )}
             </div>
-          </motion.div>
+          ) : (
+            <div className="text-6xl text-rm-faint text-center">…</div>
+          )}
 
-          {/* Images below everything */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="flex flex-col gap-6 max-w-xl mx-auto w-full"
-          >
-            <img src={img1} alt="" className="w-full rounded-lg object-contain" />
-            <img src={img2} alt="" className="w-full rounded-lg object-contain" />
-          </motion.div>
-        </div>
+          <div className="mt-8">
+            <p className="text-base lg:text-lg text-rm-text mb-4 leading-relaxed">
+              <span className="text-amber">subscribe</span> and get one retarded quest a day.<br />
+              by email. unsubscribe whenever.
+            </p>
+
+            {status === 'success' ? (
+              <div className="border border-amber p-5 bg-rm-panel">
+                <div className="text-amber font-bold mb-1">you're in.</div>
+                <p className="text-sm text-rm-muted">
+                  first quest tomorrow. close this tab. go do something.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="border border-rm bg-rm-panel">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={status === 'submitting'}
+                  placeholder="your email"
+                  className="block w-full px-4 py-4 bg-transparent text-rm-text placeholder:text-rm-faint focus:outline-none border-0"
+                />
+                {status === 'error' && (
+                  <div className="px-4 py-2 text-xs text-red-600 border-t border-rm">{errorMsg}</div>
+                )}
+                <div className="flex items-center justify-end border-t border-rm px-4 py-3">
+                  <button
+                    type="submit"
+                    disabled={status === 'submitting' || !email}
+                    className="text-sm font-bold text-amber border border-amber px-5 py-1.5 hover:bg-amber hover:text-rm-bg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {status === 'submitting' ? 'subscribing...' : 'subscribe →'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </section>
+
+        {/* VIDEO GALLERY */}
+        <section className="mb-12">
+          <div className="text-xs sm:text-sm tracking-[0.3em] uppercase font-bold text-amber mb-4">
+            [ ride the tiger ]
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {VIDEOS.map((v) => (
+              <VideoEmbed key={v.id} video={v} />
+            ))}
+          </div>
+        </section>
+
+        {/* footer */}
+        <footer className="border-t border-rm pt-6 text-xs text-rm-faint">
+          <div>retardmaxxing<span className="text-amber">.</span>app</div>
+        </footer>
+
       </div>
+
+      {/* BOTTOM MARQUEE */}
+      <Marquee />
     </div>
   );
 }

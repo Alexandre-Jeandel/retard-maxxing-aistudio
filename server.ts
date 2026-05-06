@@ -15,11 +15,20 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS subscribers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE NOT NULL,
+    source TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
 
-const insertSubscriber = db.prepare('INSERT OR IGNORE INTO subscribers (email) VALUES (?)');
+// Add source column on existing DBs that pre-date this schema (no-op if already present).
+try {
+  db.exec(`ALTER TABLE subscribers ADD COLUMN source TEXT`);
+} catch {
+  // already exists; ignore
+}
+
+const insertSubscriber = db.prepare('INSERT OR IGNORE INTO subscribers (email, source) VALUES (?, ?)');
+const getSubscriberCount = db.prepare('SELECT COUNT(*) as count FROM subscribers');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -44,9 +53,29 @@ async function startServer() {
       return res.status(400).json({ error: 'Invalid email' });
     }
 
+    // Tag the row with the hostname this signup came from, so we can
+    // distinguish retardmaxxing.app traffic from any future variants
+    // sharing the same backend / waitlist DB.
+    const host = (req.headers.host || '').toString().toLowerCase();
+    const source = host.includes('retardmaxxing')
+      ? 'retardmaxxing'
+      : host.includes('thealtar')
+        ? 'thealtar'
+        : host || 'unknown';
+
     try {
-      insertSubscriber.run(email);
+      insertSubscriber.run(email, source);
       res.json({ success: true });
+    } catch (error) {
+      console.error('Database error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/subscriber-count', (req, res) => {
+    try {
+      const row = getSubscriberCount.get() as { count: number };
+      res.json({ count: row.count });
     } catch (error) {
       console.error('Database error:', error);
       res.status(500).json({ error: 'Internal server error' });
