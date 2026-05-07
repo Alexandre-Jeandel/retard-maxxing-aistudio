@@ -85,14 +85,24 @@ body {
     );
   }
 
-  /* scrolling marquee — typographic cards.
-     each card has: tiny red quest number, bold uppercase name, muted action body.
-     no fill, just thin border + typography hierarchy. */
+  /* scrolling marquee — typographic cards. JS-driven scrollLeft loop.
+     supports click-drag (mouse) and swipe (touch) to manually scroll;
+     auto-scroll pauses while user is interacting. */
   .marquee {
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     white-space: nowrap;
     border-block: 1px solid var(--color-rm-border);
     background: var(--color-rm-bg);
+    cursor: grab;
+    user-select: none;
+    scrollbar-width: none;       /* firefox */
+  }
+  .marquee::-webkit-scrollbar {  /* chrome / safari */
+    display: none;
+  }
+  .marquee:active {
+    cursor: grabbing;
   }
   .marquee-track {
     display: inline-flex;
@@ -100,8 +110,6 @@ body {
     gap: 0.625rem;
     padding-block: 0.875rem;
     padding-inline: 0.625rem;
-    animation: marquee 220s linear infinite;
-    will-change: transform;
   }
   .marquee-card {
     display: inline-flex;
